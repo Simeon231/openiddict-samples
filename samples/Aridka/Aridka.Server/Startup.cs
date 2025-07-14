@@ -1,5 +1,7 @@
-﻿using Aridka.Server.Models;
+﻿using Aridka.Server.Handlers;
+using Aridka.Server.Models;
 using Microsoft.EntityFrameworkCore;
+using OpenIddict.Server;
 using Quartz;
 
 namespace Aridka.Server;
@@ -60,6 +62,14 @@ public class Startup
                 // Enable the client credentials flow.
                 options.AllowClientCredentialsFlow();
 
+                options.AllowCustomFlow("custom_grant");
+
+                options.AddEventHandler<OpenIddictServerEvents.HandleTokenRequestContext>(context =>
+                {
+                    context.UseSingletonHandler<CustomGrantHandler>();
+                    context.SetType(OpenIddictServerHandlerType.Custom);
+                });
+
                 // Register the signing and encryption credentials.
                 options.AddDevelopmentEncryptionCertificate()
                        .AddDevelopmentSigningCertificate();
@@ -67,6 +77,9 @@ public class Startup
                 // Register the ASP.NET Core host and configure the ASP.NET Core-specific options.
                 options.UseAspNetCore()
                        .EnableTokenEndpointPassthrough();
+
+                // For testing purposes
+                options.DisableAccessTokenEncryption();
             })
 
             // Register the OpenIddict validation components.

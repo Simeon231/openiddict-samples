@@ -1,5 +1,6 @@
 ﻿using System.Net.Http.Headers;
 using Microsoft.Extensions.DependencyInjection;
+using OpenIddict.Abstractions;
 using OpenIddict.Client;
 
 var services = new ServiceCollection();
@@ -11,6 +12,8 @@ services.AddOpenIddict()
     {
         // Allow grant_type=client_credentials to be negotiated.
         options.AllowClientCredentialsFlow();
+        
+        options.AllowCustomFlow("custom_grant");
 
         // Disable token storage, which is not necessary for non-interactive flows like
         // grant_type=password, grant_type=client_credentials or grant_type=refresh_token.
@@ -34,19 +37,44 @@ services.AddOpenIddict()
 
 await using var provider = services.BuildServiceProvider();
 
-var token = await GetTokenAsync(provider);
-Console.WriteLine("Access token: {0}", token);
-Console.WriteLine();
+Console.WriteLine("OpenIddict Client Test");
 
-var resource = await GetResourceAsync(provider, token);
-Console.WriteLine("API response: {0}", resource);
+// var token = await GetTokenAsync(provider);
+// Console.WriteLine("Access token: {0}", token);
+// Console.WriteLine();
+//
+// var resource = await GetResourceAsync(provider, token);
+// Console.WriteLine("API response: {0}", resource);
+
+var customToken = await GetTokenByCustomGrantAsync(provider);
+Console.WriteLine("Custom access token: {0}", customToken);
+
+var resource2 = await GetResourceAsync(provider, customToken);
+Console.WriteLine("API response returned by custom token: {0}", resource2);
+
 Console.ReadLine();
+//
+// static async Task<string> GetTokenAsync(IServiceProvider provider)
+// {
+//     var service = provider.GetRequiredService<OpenIddictClientService>();
+//
+//     var result = await service.AuthenticateWithClientCredentialsAsync(new());
+//     return result.AccessToken;
+// }
 
-static async Task<string> GetTokenAsync(IServiceProvider provider)
+static async Task<string> GetTokenByCustomGrantAsync(IServiceProvider provider)
 {
     var service = provider.GetRequiredService<OpenIddictClientService>();
+    
+    var result = await service.AuthenticateWithCustomGrantAsync(new OpenIddictClientModels.CustomGrantAuthenticationRequest
+    {
+        GrantType = "custom_grant",
+        AdditionalTokenRequestParameters = new Dictionary<string, OpenIddictParameter>
+        {
+            ["custom_parameter"] = "custom_value",
+        },
+    });
 
-    var result = await service.AuthenticateWithClientCredentialsAsync(new());
     return result.AccessToken;
 }
 

@@ -5,6 +5,7 @@
  */
 
 using System.Security.Claims;
+using System.Text.Json.Nodes;
 using Aridka.Server.Helpers;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Mvc;
@@ -19,11 +20,13 @@ public class AuthorizationController : Controller
 {
     private readonly IOpenIddictApplicationManager _applicationManager;
     private readonly IOpenIddictScopeManager _scopeManager;
+    private readonly ILogger<AuthorizationController> logger;
 
-    public AuthorizationController(IOpenIddictApplicationManager applicationManager, IOpenIddictScopeManager scopeManager)
+    public AuthorizationController(IOpenIddictApplicationManager applicationManager, IOpenIddictScopeManager scopeManager, ILogger<AuthorizationController> logger)
     {
         _applicationManager = applicationManager;
         _scopeManager = scopeManager;
+        this.logger = logger;
     }
 
     [HttpPost("~/connect/token"), IgnoreAntiforgeryToken, Produces("application/json")]
@@ -32,11 +35,10 @@ public class AuthorizationController : Controller
         var request = HttpContext.GetOpenIddictServerRequest() ??
             throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
-        if (request.IsClientCredentialsGrantType())
+        if (request.IsClientCredentialsGrantType() || request.GrantType == "custom_grant")
         {
             // Note: the client credentials are automatically validated by OpenIddict:
             // if client_id or client_secret are invalid, this action won't be invoked.
-
             var application = await _applicationManager.FindByClientIdAsync(request.ClientId!);
             if (application == null)
             {
@@ -52,6 +54,12 @@ public class AuthorizationController : Controller
             // Add the claims that will be persisted in the tokens (use the client_id as the subject identifier).
             identity.SetClaim(Claims.Subject, await _applicationManager.GetClientIdAsync(application));
             identity.SetClaim(Claims.Name, await _applicationManager.GetDisplayNameAsync(application));
+            
+            // Custom claim
+            identity.SetClaim("custom_claim", "custom_claim_value");
+            JsonNode? handlerClaim = null;
+            request.Claims?.TryGetPropertyValue("handler_claim", out handlerClaim);
+            identity.SetClaim("handler_claim", handlerClaim?.GetValue<string>());
 
             // Note: In the original OAuth 2.0 specification, the client credentials grant
             // doesn't return an identity token, which is an OpenID Connect concept.

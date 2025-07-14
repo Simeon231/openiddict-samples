@@ -16,24 +16,23 @@ public class Worker : IHostedService
         await using var scope = _serviceProvider.CreateAsyncScope();
 
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await context.Database.EnsureDeletedAsync();
         await context.Database.EnsureCreatedAsync();
 
         var manager = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
-
-        if (await manager.FindByClientIdAsync("console") == null)
+        
+        await manager.CreateAsync(new OpenIddictApplicationDescriptor
         {
-            await manager.CreateAsync(new OpenIddictApplicationDescriptor
+            ClientId = "console",
+            ClientSecret = "388D45FA-B36B-4988-BA59-B187D329C207",
+            DisplayName = "My client application",
+            Permissions =
             {
-                ClientId = "console",
-                ClientSecret = "388D45FA-B36B-4988-BA59-B187D329C207",
-                DisplayName = "My client application",
-                Permissions =
-                {
-                    Permissions.Endpoints.Token,
-                    Permissions.GrantTypes.ClientCredentials
-                }
-            });
-        }
+                Permissions.Endpoints.Token,
+                Permissions.GrantTypes.ClientCredentials,
+                $"{Permissions.Prefixes.GrantType}custom_grant"
+            }
+        });
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
